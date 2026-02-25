@@ -1,0 +1,9 @@
+# Newman reports
+reports/
+newman/
+
+# HTML Reports
+*.html
+
+# Logs
+*.log
