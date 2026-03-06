@@ -1,0 +1,311 @@
+{
+  "info": {
+    "name": "Flow 02 - Authorization Code",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52148220",
+    "_collection_link": "https://go.postman.co/collection/52148220-90db9eda-b543-448b-b213-a3295de699bd?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Positive Scenarios",
+      "item": [
+        {
+          "name": "01 - Build Authorization URL (Open URL in Browser)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{auth_base_url}}/authorize?response_type=code&client_id={{client_id}}&redirect_uri={{redirect_uri}}&state=scope_string_123&scope=playlist-read-private",
+              "host": ["{{auth_base_url}}"],
+              "path": ["authorize"],
+              "query": [
+                {
+                  "key": "response_type",
+                  "value": "code"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{redirect_uri}}"
+                },
+                {
+                  "key": "state",
+                  "value": "scope_string_123"
+                },
+                {
+                  "key": "scope",
+                  "value": "playlist-read-private"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 - Exchange Authorization Code for Tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json()",
+                  "",
+                  "",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Access token is not empty\", function () {",
+                  "    pm.expect(response.access_token).to.not.be.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"refresh token is not empty\", function () {",
+                  "    pm.expect(response.refresh_token).to.not.be.empty;",
+                  "});",
+                  "",
+                  "",
+                  "if (response.access_token !== null && response.access_token !== null) {",
+                  "    pm.environment.set(\"access_token\", response.access_token)",
+                  "    pm.environment.set(\"refresh_token\", response.refresh_token)",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{client_secret}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{client_id}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code",
+                  "type": "text",
+                  "uuid": "aaf80e7d-0cac-4613-bbb9-92983dccc1e2"
+                },
+                {
+                  "key": "code",
+                  "value": "{{authorization_code}}",
+                  "type": "text",
+                  "uuid": "9d5d1a25-2b21-4548-9447-ef4b3e179616"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "{{redirect_uri}}",
+                  "type": "text",
+                  "uuid": "2f87f67f-eda4-4020-81cc-2504b846a63b"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{auth_base_url}}/api/token",
+              "host": ["{{auth_base_url}}"],
+              "path": ["api", "token"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 - Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const responseBody = pm.response.json();",
+                  "",
+                  "pm.test(\"Status code is 200\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Access token is not empty\", () => {",
+                  "    pm.expect(responseBody.access_token).to.not.be.empty;",
+                  "    pm.expect(responseBody.access_token).to.be.a('string');",
+                  "});",
+                  "",
+                  "if (responseBody.access_token !== null) {",
+                  "    pm.environment.set(\"access_token\", responseBody.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{client_secret}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{client_id}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "refresh_token",
+                  "type": "text",
+                  "uuid": "edbe2982-7050-405c-9233-f1771a75439d"
+                },
+                {
+                  "key": "refresh_token",
+                  "value": "{{refresh_token}}",
+                  "type": "text",
+                  "uuid": "2f17004f-89a3-4e81-b394-e52df939fea6"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://accounts.spotify.com/api/token",
+              "protocol": "https",
+              "host": ["accounts", "spotify", "com"],
+              "path": ["api", "token"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 - Get User Playlists",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.spotify.com/v1/me/playlists/",
+              "protocol": "https",
+              "host": ["api", "spotify", "com"],
+              "path": ["v1", "me", "playlists", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Negative Scenarios",
+      "item": [
+        {
+          "name": "01 - Get User Playlists No token provided",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "",
+                  "pm.test(\"Status code is 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "",
+                  "pm.test(\"Error message is 'No token provided'\", () => {",
+                  "    pm.expect(response.error.message).to.eql('No token provided');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.spotify.com/v1/me/playlists/",
+              "protocol": "https",
+              "host": ["api", "spotify", "com"],
+              "path": ["v1", "me", "playlists", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [""]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "redirect_uri",
+      "value": ""
+    },
+    {
+      "key": "auth_base_url",
+      "value": ""
+    }
+  ]
+}
