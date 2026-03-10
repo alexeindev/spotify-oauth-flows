@@ -26,7 +26,12 @@ code_verifier  = base64url( random_bytes(32) )
 code_challenge = base64url( SHA256( code_verifier ) )
 ```
 
+
+![Code verifier construction](https://github.com/user-attachments/assets/1ed725a7-1e26-4839-9228-afb1850beca6)
+
+
 > **Key insight:** the authorization server stores the `code_challenge`. When the client later exchanges the code, it sends the raw `code_verifier`. The server re-hashes it and compares — if they match, it proves the requester is the same entity that started the flow.
+
 
 ---
 
@@ -57,6 +62,13 @@ GET https://accounts.spotify.com/authorize
   &state=xyzABC123
 ```
 
+![Code verifier construction](https://github.com/user-attachments/assets/53d336c2-7168-4c8b-95d8-3a15fef1d634)
+
+
+
+
+
+
 ---
 
 ## Step 2 — User Authenticates and Grants Permission
@@ -70,6 +82,8 @@ https://localhost:3000/callback
   ?code=AQDfZPixxxxxxxxxxxxxxxxxxxxxx
   &state=xyzABC123
 ```
+
+![User login screen](https://github.com/user-attachments/assets/ead8081e-6a35-45ab-aa6b-fb7fe99ea9e9)
 
 > ⚠️ **Validate the `state` value before proceeding.** If it doesn't match what you sent in Step 1, abort — this could be a CSRF attack.
 
@@ -107,6 +121,8 @@ grant_type=authorization_code
 &client_id=YOUR_CLIENT_ID
 &code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
 ```
+![Request token](https://github.com/user-attachments/assets/70dea2b7-2dfb-44a8-9bdd-9c17311bd503)
+
 
 If the request is valid, the authorization server responds with an access token and, typically, a refresh token:
 
@@ -133,6 +149,9 @@ Store the refresh token securely. It allows the client to obtain a new access to
 | CLI tool | Encrypted file or OS credential manager |
 
 > ⚠️ If the server uses **refresh token rotation**, the old token is invalidated on use. Store the new one immediately — discarding it means the user must re-authenticate.
+
+![Request token](https://github.com/user-attachments/assets/fc1329a0-16f9-4696-b82f-c7affec18a02)
+
 
 ---
 
@@ -167,6 +186,8 @@ grant_type=refresh_token
 
 If the refresh token is still valid, the authorization server returns a new access token — and in some implementations, a new refresh token as well.
 
+![Refresh token](https://github.com/user-attachments/assets/d2a39aa8-075f-453a-8cd9-4c24b8a4ebdf)
+
 ---
 
 ## Step 6 — Access the Protected Resource
@@ -174,12 +195,15 @@ If the refresh token is still valid, the authorization server returns a new acce
 Use the access token to call the resource server. Include it in the `Authorization` header using the Bearer scheme:
 
 ```http
-GET /v1/me/playlists
+GET /v1/me
 Authorization: Bearer BQDxxxxxxx...
 Host: api.spotify.com
 ```
 
 The resource server validates the token and, if it is valid and the required scopes are present, returns the requested resource.
+
+![Protected Resource](https://github.com/user-attachments/assets/a0d4dbdf-764b-41e4-9041-bad7b1175a42)
+
 
 ---
 
