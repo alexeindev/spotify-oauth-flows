@@ -1,228 +1,173 @@
-# Authorization Code Flow + PKCE
+# 🎵 Spotify OAuth 2.0 Flows — Postman Demo
 
-A step-by-step walkthrough of the OAuth 2.0 Authorization Code Flow with PKCE, designed for **public clients** that cannot safely store a `client_secret` (SPAs, mobile apps, CLI tools).
-
----
-
-## What is PKCE and why does it exist?
-
-**PKCE** (Proof Key for Code Exchange, pronounced *"pixie"*) is an extension to the Authorization Code Flow that solves a specific problem: if an attacker intercepts the authorization code before the client exchanges it for a token, they can use it themselves — because there is no `client_secret` to authenticate the client.
-
-PKCE mitigates this by **binding the authorization request to the token request** through a cryptographic challenge. The client generates a secret locally, sends a hash of it upfront, and proves ownership of the original secret at exchange time.
+A Postman collection demonstrating the three OAuth 2.0 grant types supported by the Spotify Web API, with pre-request scripts for automated token management and environment variable handling.
 
 ---
 
-## PKCE Mechanics — The Code Verifier & Challenge
+## 📌 What This Project Covers
 
-Before sending the authorization request, the client generates two linked values:
-
-| Value | Description |
-|---|---|
-| `code_verifier` | A cryptographically random string, 43–128 characters. Generated locally. **Never sent to the authorization server directly.** |
-| `code_challenge` | The result of hashing the verifier with SHA-256, then Base64URL-encoding it. This is what gets sent in Step 1. |
-
-```
-code_verifier  = base64url( random_bytes(32) )
-code_challenge = base64url( SHA256( code_verifier ) )
-```
-
-
-![Code verifier construction](https://github.com/user-attachments/assets/1ed725a7-1e26-4839-9228-afb1850beca6)
-
-
-> **Key insight:** the authorization server stores the `code_challenge`. When the client later exchanges the code, it sends the raw `code_verifier`. The server re-hashes it and compares — if they match, it proves the requester is the same entity that started the flow.
-
+| Flow                      | Client Type  | Token Type       | Requires User |
+| ------------------------- | ------------ | ---------------- | ------------- |
+| Client Credentials        | Confidential | Access only      | No            |
+| Authorization Code        | Confidential | Access + Refresh | Yes           |
+| Authorization Code + PKCE | Public       | Access + Refresh | Yes           |
 
 ---
 
-## Step 1 — Generate PKCE Values & Build the Authorization URL
+## 🗂️ Collection Structure
 
-Generate the `code_verifier` and `code_challenge` locally, then redirect the browser to the authorization endpoint with the following query parameters:
-
-| Parameter | Required | Description |
-|---|---|---|
-| `response_type` | ✅ | Must be `code` |
-| `client_id` | ✅ | Your application's client ID |
-| `redirect_uri` | ✅ | Where the server redirects after authorization |
-| `scope` | ✅ | The permissions being requested |
-| `code_challenge` | ✅ | `base64url(SHA256(code_verifier))` |
-| `code_challenge_method` | ✅ | Always `S256` — never `plain` in production |
-| `state` | ⚠️ | Strongly recommended — random value for CSRF protection |
-
-> **Note:** This is not a regular API call — it is a browser redirect. The `client_secret` is absent by design; PKCE replaces it.
+Each flow is organized into **Positive Scenarios** and **Negative Scenarios**.
 
 ```
-GET https://accounts.spotify.com/authorize
-  ?response_type=code
-  &client_id=YOUR_CLIENT_ID
-  &redirect_uri=http://localhost:3000/callback
-  &scope=user-read-private%20playlist-read-private
-  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
-  &code_challenge_method=S256
-  &state=xyzABC123
-```
+Flow 01 - Client Credentials
+├── Positive Scenarios
+│   ├── POST  01 - Get authorization token
+│   └── GET   02 - Get Artist Info
+└── Negative Scenarios
+    ├── POST  01 - Get authorization token - Invalid Credentials
+    ├── GET   02 - Get artist info - Invalid Token
+    └── GET   03 - Get artist info - Invalid Artist ID
 
-![Code verifier construction](https://github.com/user-attachments/assets/53d336c2-7168-4c8b-95d8-3a15fef1d634)
+Flow 02 - Authorization Code
+├── Positive Scenarios
+│   ├── GET   01 - Build Authorization URL (Open URL in Browser)
+│   ├── POST  02 - Exchange Authorization Code for Tokens
+│   ├── POST  03 - Refresh Token
+│   └── GET   04 - Get User Playlists
+└── Negative Scenarios
+    └── GET   01 - Get User Playlists No token provided
 
-
-
-
-
-
----
-
-## Step 2 — User Authenticates and Grants Permission
-
-Paste the complete authorization URL in the browser. The user authenticates and grants permission to the client application.
-
-After approval, the authorization server redirects back to the `redirect_uri` with the authorization code and the `state` value:
-
-```
-https://localhost:3000/callback
-  ?code=AQDfZPixxxxxxxxxxxxxxxxxxxxxx
-  &state=xyzABC123
-```
-
-![User login screen](https://github.com/user-attachments/assets/ead8081e-6a35-45ab-aa6b-fb7fe99ea9e9)
-
-> ⚠️ **Validate the `state` value before proceeding.** If it doesn't match what you sent in Step 1, abort — this could be a CSRF attack.
-
----
-
-## Step 3 — Exchange the Authorization Code for an Access Token
-
-Extract the authorization code from the redirect URL and send a `POST` request to the token endpoint. This is where PKCE proves its value — you send the raw `code_verifier` instead of a `client_secret`.
-
-**Headers**
-
-| Header | Value |
-|---|---|
-| `Content-Type` | `application/x-www-form-urlencoded` |
-
-> No `Authorization` header here. Public clients do not authenticate with a `client_secret`. The `code_verifier` is the proof of identity.
-
-**Body Parameters**
-
-| Parameter | Value |
-|---|---|
-| `grant_type` | `authorization_code` |
-| `code` | The authorization code received in Step 2 |
-| `redirect_uri` | Must exactly match the URI used in Step 1 |
-| `client_id` | Your application's client ID |
-| `code_verifier` | The original random string generated in Step 1 (**not** the hash) |
-
-```
-POST https://accounts.spotify.com/api/token
-Content-Type: application/x-www-form-urlencoded
-
-grant_type=authorization_code
-&code=AQDfZPixxxxxxxxxxxxxxxxxxxxxx
-&redirect_uri=http://localhost:3000/callback
-&client_id=YOUR_CLIENT_ID
-&code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
-```
-![Request token](https://github.com/user-attachments/assets/70dea2b7-2dfb-44a8-9bdd-9c17311bd503)
-
-
-If the request is valid, the authorization server responds with an access token and, typically, a refresh token:
-
-```json
-{
-  "access_token":  "BQDxxxxxxx...",
-  "token_type":    "Bearer",
-  "expires_in":    3600,
-  "refresh_token": "AQDxxxxxxx...",
-  "scope":         "user-read-private playlist-read-private"
-}
+Flow 03 - Authorization Code + PKCE
+├── Positive Scenarios
+│   ├── GET   01 - Build Authorization URL (Open URL in Browser)
+│   ├── POST  02 - Exchange Authorization Code for Tokens
+│   ├── POST  03 - Refresh Token
+│   └── GET   04 - Get user information
+└── Negative Scenarios
+    ├── GET   Get users playlists - No token provided
+    └── POST  Refresh Token revoked
 ```
 
 ---
 
-## Step 4 — Store the Refresh Token
+## ⚙️ Setup
 
-Store the refresh token securely. It allows the client to obtain a new access token later without prompting the user to authenticate again.
+### Prerequisites
 
-| Client Type | Recommended Storage |
-|---|---|
-| SPA (browser) | In-memory only — never `localStorage` (XSS risk) |
-| Mobile app | Secure OS keychain (Keychain on iOS, Keystore on Android) |
-| CLI tool | Encrypted file or OS credential manager |
+- [Postman](https://www.postman.com/downloads/) v10+
+- A registered app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 
-> ⚠️ If the server uses **refresh token rotation**, the old token is invalidated on use. Store the new one immediately — discarding it means the user must re-authenticate.
+### 1. Register Your App on Spotify
 
-![Request token](https://github.com/user-attachments/assets/fc1329a0-16f9-4696-b82f-c7affec18a02)
+1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) → **Create App**
+2. Set **Redirect URI** to: `https://oauth.pstmn.io/v1/callback`
+3. Copy your `Client ID` and `Client Secret`
 
+### 2. Configure the Environment
+
+Import `SpotifyEnv.postman_environment.json` into Postman and fill in your credentials:
+
+| Variable                  | Type    | Description                                                              |
+| ------------------------- | ------- | ------------------------------------------------------------------------ |
+| `client_id`               | secret  | Your Spotify App Client ID                                               |
+| `client_secret`           | secret  | Your Spotify App Client Secret _(Auth Code flow only)_                   |
+| `access_token`            | secret  | Populated automatically after token exchange (Auth Code flow)            |
+| `refresh_token`           | secret  | Populated automatically after token exchange (Auth Code flow)            |
+| `access_token_pkce`       | secret  | Populated automatically after token exchange (PKCE flow)                 |
+| `refresh_token_pkce`      | secret  | Populated automatically after token exchange (PKCE flow)                 |
+| `authorization_code`      | default | The `code` returned by Spotify after user authorization (Auth Code flow) |
+| `authorization_code_pkce` | default | The `code` returned by Spotify after user authorization (PKCE flow)      |
+
+> ⚠️ **Never commit credentials to version control.** Secret-type variables are stored locally in Postman and are not exported. Keep `SpotifyEnv.postman_environment.json` in `.gitignore`.
+
+### 3. Import the Collection
+
+Import the collection file into Postman. All three flows live in a single collection.
 
 ---
 
-## Step 5 — Refresh the Access Token
+## 🚀 Running the Flows
 
-When the access token expires, send a new `POST` request to the token endpoint:
+### Flow 01 — Client Credentials
 
-**Headers**
+No user interaction required.
 
-| Header | Value |
-|---|---|
-| `Content-Type` | `application/x-www-form-urlencoded` |
+1. Fill in `client_id` and `client_secret` in the environment
+2. Run **01 - Get authorization token** — `access_token` is stored automatically
+3. Run **02 - Get Artist Info** to verify
 
-**Body Parameters**
+### Flow 02 — Authorization Code
 
-| Parameter | Value |
-|---|---|
-| `grant_type` | `refresh_token` |
-| `refresh_token` | The stored refresh token |
-| `client_id` | Your application's client ID |
+Requires manual browser step to obtain the authorization code.
 
-Public clients do not include a `client_secret` here either. The `client_id` alone identifies the application.
+1. Run **01 - Build Authorization URL** — the pre-request script generates the URL and logs it to the Postman console
+2. Open that URL in a browser, log in, and authorize the app
+3. Copy the `code` parameter from the redirect URL and paste it into `authorization_code` in the environment
+4. Run **02 - Exchange Authorization Code for Tokens** — `access_token` and `refresh_token` are stored automatically
+5. Run **03 - Refresh Token** to test token renewal
+6. Run **04 - Get User Playlists** to verify the token works
 
+### Flow 03 — Authorization Code + PKCE
+
+Same browser step as Flow 02, but no `client_secret` is used. The PKCE `code_verifier` and `code_challenge` are generated in the pre-request script.
+
+1. Run **01 - Build Authorization URL** — PKCE parameters are generated and the URL is logged to the console
+2. Open that URL in a browser, log in, and authorize the app
+3. Copy the `code` from the redirect URL and paste it into `authorization_code_pkce` in the environment
+4. Run **02 - Exchange Authorization Code for Tokens** — `access_token_pkce` and `refresh_token_pkce` are stored automatically
+5. Run **03 - Refresh Token** to test rotation
+6. Run **04 - Get user information** to verify
+
+---
+
+## ⚠️ Why These Flows Can't Be Automated with Newman
+
+Newman (Postman's CLI runner) is designed for headless, non-interactive execution. Two of the three flows in this project — **Authorization Code** and **Authorization Code + PKCE** — require a real user to log in to Spotify and grant permissions through a browser. That interactive step happens outside of Postman entirely and cannot be automated headlessly.
+
+The flow breaks down like this:
+
+1. Your app redirects the user to `accounts.spotify.com/authorize`
+2. Spotify renders a login/consent page in a browser
+3. The user authenticates and approves scopes
+4. Spotify redirects back with a one-time `authorization_code` in the URL
+
+Newman has no browser, no way to interact with a login page, and no way to intercept that redirect. You would need to manually grab the `authorization_code` from the redirect URL and paste it into the environment before the token exchange step can run.
+
+**The only flow that is fully automatable with Newman is Client Credentials**, since it is a pure machine-to-machine exchange — no user, no browser, no redirect.
+
+```bash
+# Only the Client Credentials collection can run headlessly
+newman run collections/client-credentials.postman_collection.json \
+  --environment environments/spotify-oauth.postman_environment.json \
+  --reporters cli,htmlextra \
+  --reporter-htmlextra-export reports/results.html
 ```
-POST https://accounts.spotify.com/api/token
-Content-Type: application/x-www-form-urlencoded
 
-grant_type=refresh_token
-&refresh_token=AQDxxxxxxx...
-&client_id=YOUR_CLIENT_ID
-```
+For the Authorization Code and PKCE flows, use Postman's collection runner after completing the manual auth step described above.
 
-If the refresh token is still valid, the authorization server returns a new access token — and in some implementations, a new refresh token as well.
+## 🔄 Token Lifecycle & Security Notes
 
-![Refresh token](https://github.com/user-attachments/assets/d2a39aa8-075f-453a-8cd9-4c24b8a4ebdf)
+- **Access tokens** expire after 3600 seconds (1 hour). The collections include pre-request scripts that check expiry and refresh automatically.
+- **Refresh token rotation**: Spotify may issue a new refresh token on each use. The collections store the latest token, invalidating the previous one.
+- **PKCE protects against authorization code interception** — even if the code is stolen, it's useless without the `code_verifier` that never leaves the client.
+- `client_secret` is only used in confidential flows. It must never be exposed in client-side code or committed to a public repository.
 
 ---
 
-## Step 6 — Access the Protected Resource
+## 📊 Scopes Used
 
-Use the access token to call the resource server. Include it in the `Authorization` header using the Bearer scheme:
+| Scope               | Purpose                          |
+| ------------------- | -------------------------------- |
+| `user-read-private` | Read user's subscription details |
+| `user-read-email`   | Access user's email address      |
 
-```http
-GET /v1/me
-Authorization: Bearer BQDxxxxxxx...
-Host: api.spotify.com
-```
-
-The resource server validates the token and, if it is valid and the required scopes are present, returns the requested resource.
-
-![Protected Resource](https://github.com/user-attachments/assets/a0d4dbdf-764b-41e4-9041-bad7b1175a42)
-
+Adjust scopes in the environment variable based on what your use case requires. Full scope list: [Spotify Scopes Reference](https://developer.spotify.com/documentation/web-api/concepts/scopes).
 
 ---
 
-## PKCE vs Standard Authorization Code — Key Differences
+## 📚 References
 
-| Aspect | Standard Auth Code | Auth Code + PKCE |
-|---|---|---|
-| Client type | Confidential | Public (SPA, mobile, CLI) |
-| Client authenticates with | `client_secret` (Base64 in header) | `code_verifier` (body param, no secret) |
-| Extra params in auth URL | None | `code_challenge` + `code_challenge_method` |
-| Extra params in token exchange | None | `code_verifier` |
-| Protects against | Stolen code (with secret as second factor) | Stolen code (via hash binding) |
-
----
-
-## Security Notes
-
-- **Always use `S256`** — the `plain` method offers no real protection and should never be used in production.
-- **`code_verifier` is single-use** — generate a fresh pair for every authorization flow. Never reuse the same verifier.
-- **Validate `state` on return** — a mismatch means the response is forged or replayed.
-- **Refresh tokens in SPAs** — if you cannot store the refresh token safely, consider short-lived access tokens and silent re-auth instead.
-- **Authorization codes are single-use** — they expire quickly (typically 10 minutes). If you get a `400` on exchange, the code may have already been consumed.
+- [Spotify Authorization Guide](https://developer.spotify.com/documentation/web-api/concepts/authorization)
+- [RFC 6749 – The OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)
+- [RFC 7636 – PKCE](https://datatracker.ietf.org/doc/html/rfc7636)
+- [Postman OAuth 2.0 Docs](https://learning.postman.com/docs/sending-requests/authorization/oauth-20/)
