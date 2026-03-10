@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Flow 02 - Authorization Code",
+    "name": "Flow 03 - Authorization Code + PKCE",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "52148220"
   },
@@ -9,12 +9,56 @@
       "name": "Positive Scenarios",
       "item": [
         {
-          "name": "01 - Build Authorization URL (Open URL in Browser)",
+          "name": "01 - Build Authorization URL (Open URL in Browser) Copy",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "",
+                  "function generateCodeVerifier(length = 64) {",
+                  "    // Generates a random code_verifier (43–128 chars) Code verifier is a random string that is URL-safe and has a length between 43 and 128 characters. It is used to generate a code challenge ",
+                  "    const charset = \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~\";",
+                  "    let verifier = \"\";",
+                  "    for (let i = 0; i < length; i++) {",
+                  "        verifier += charset.charAt(Math.floor(Math.random() * charset.length));",
+                  "    }",
+                  "    return verifier;",
+                  "}",
+                  "",
+                  "// Convert Base64 → Base64URL",
+                  "function base64UrlEncode(wordArray) {",
+                  "    return CryptoJS.enc.Base64.stringify(wordArray)",
+                  "        .replace(/\\+/g, \"-\")",
+                  "        .replace(/\\//g, \"_\")",
+                  "        .replace(/=+$/, \"\");",
+                  "}",
+                  "",
+                  "// 1 Generate verifier",
+                  "const code_verifier = generateCodeVerifier();",
+                  "",
+                  "// 2 SHA256 hash",
+                  "const hashed = CryptoJS.SHA256(code_verifier);",
+                  "",
+                  "// 3 Base64URL encode",
+                  "const code_challenge = base64UrlEncode(hashed);",
+                  "",
+                  "// 4 Save variables",
+                  "pm.collectionVariables.set(\"code_verifier\", code_verifier);",
+                  "pm.collectionVariables.set(\"code_challenge\", code_challenge);",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{auth_base_url}}/authorize?response_type=code&client_id={{client_id}}&redirect_uri={{redirect_uri}}&state=scope_string_123&scope=playlist-read-private",
+              "raw": "{{auth_base_url}}/authorize?response_type=code&client_id={{client_id}}&redirect_uri={{redirect_uri}}&state=scope_string_123&scope=playlist-read-private&code_challenge={{code_challenge}}&code_challenge_method=S256&code_verifier={{code_verifier}}",
               "host": ["{{auth_base_url}}"],
               "path": ["authorize"],
               "query": [
@@ -37,6 +81,18 @@
                 {
                   "key": "scope",
                   "value": "playlist-read-private"
+                },
+                {
+                  "key": "code_challenge",
+                  "value": "{{code_challenge}}"
+                },
+                {
+                  "key": "code_challenge_method",
+                  "value": "S256"
+                },
+                {
+                  "key": "code_verifier",
+                  "value": "{{code_verifier}}"
                 }
               ]
             }
@@ -80,19 +136,7 @@
           ],
           "request": {
             "auth": {
-              "type": "basic",
-              "basic": [
-                {
-                  "key": "password",
-                  "value": "{{client_secret}}",
-                  "type": "string"
-                },
-                {
-                  "key": "username",
-                  "value": "{{client_id}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
             "method": "POST",
             "header": [],
@@ -107,7 +151,7 @@
                 },
                 {
                   "key": "code",
-                  "value": "{{authorization_code}}",
+                  "value": "{{authorization_code_pkce}}",
                   "type": "text",
                   "uuid": "9d5d1a25-2b21-4548-9447-ef4b3e179616"
                 },
@@ -116,6 +160,18 @@
                   "value": "{{redirect_uri}}",
                   "type": "text",
                   "uuid": "2f87f67f-eda4-4020-81cc-2504b846a63b"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}",
+                  "type": "text",
+                  "uuid": "233ee0c1-7583-422f-91a9-d1c86b5a40c1"
+                },
+                {
+                  "key": "code_verifier",
+                  "value": "{{code_verifier}}",
+                  "type": "text",
+                  "uuid": "19411060-fc98-4a75-9f83-100bedbc6326"
                 }
               ]
             },
@@ -147,6 +203,11 @@
                   "",
                   "if (responseBody.access_token !== null) {",
                   "    pm.environment.set(\"access_token\", responseBody.access_token);",
+                  "}",
+                  "",
+                  "//Because this uses token rotation strategy",
+                  "if (responseBody.refresh_token !== null) {",
+                  "    pm.environment.set(\"refresh_token\", responseBody.refresh_token);",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -200,14 +261,14 @@
           "response": []
         },
         {
-          "name": "04 - Get User Playlists",
+          "name": "04 Get user information",
           "request": {
             "auth": {
               "type": "bearer",
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{access_token}}",
+                  "value": "{{access_token_pkce}}",
                   "type": "string"
                 }
               ]
@@ -215,10 +276,10 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "https://api.spotify.com/v1/me/playlists/",
+              "raw": "https://api.spotify.com/v1/me/",
               "protocol": "https",
               "host": ["api", "spotify", "com"],
-              "path": ["v1", "me", "playlists", ""]
+              "path": ["v1", "me", ""]
             }
           },
           "response": []
@@ -226,10 +287,10 @@
       ]
     },
     {
-      "name": "Negative Scenarios",
+      "name": "Negative Scenarios Copy",
       "item": [
         {
-          "name": "01 - Get User Playlists No token provided",
+          "name": "Get users playlists - No token provided",
           "event": [
             {
               "listen": "test",
@@ -266,10 +327,77 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "https://api.spotify.com/v1/me/playlists/",
+              "raw": "https://api.spotify.com/v1/me/",
               "protocol": "https",
               "host": ["api", "spotify", "com"],
-              "path": ["v1", "me", "playlists", ""]
+              "path": ["v1", "me", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token revoked",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const responseBody = pm.response.json();",
+                  "",
+                  "pm.test(\"Status code is 400\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Refresh token must be supplied error\", () => {",
+                  "    pm.expect(responseBody.error).to.eql(\"invalid_request\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "{{client_secret}}",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "{{client_id}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "refresh_token",
+                  "type": "text",
+                  "uuid": "edbe2982-7050-405c-9233-f1771a75439d"
+                },
+                {
+                  "key": "refresh_token",
+                  "value": "",
+                  "type": "text",
+                  "uuid": "2f17004f-89a3-4e81-b394-e52df939fea6"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://accounts.spotify.com/api/token",
+              "protocol": "https",
+              "host": ["accounts", "spotify", "com"],
+              "path": ["api", "token"]
             }
           },
           "response": []
@@ -277,6 +405,86 @@
       ]
     }
   ],
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "clientSecret",
+        "value": "{{client_secret}}",
+        "type": "string"
+      },
+      {
+        "key": "accessTokenUrl",
+        "value": "https://accounts.spotify.com/api/token",
+        "type": "string"
+      },
+      {
+        "key": "authUrl",
+        "value": "https://accounts.spotify.com/authorize",
+        "type": "string"
+      },
+      {
+        "key": "redirect_uri",
+        "value": "https://oauth.pstmn.io/v1/callback",
+        "type": "string"
+      },
+      {
+        "key": "useBrowser",
+        "value": false,
+        "type": "boolean"
+      },
+      {
+        "key": "scope",
+        "value": "user-read-private user-read-email",
+        "type": "string"
+      },
+      {
+        "key": "refreshRequestParams",
+        "value": [],
+        "type": "any"
+      },
+      {
+        "key": "tokenRequestParams",
+        "value": [],
+        "type": "any"
+      },
+      {
+        "key": "authRequestParams",
+        "value": [],
+        "type": "any"
+      },
+      {
+        "key": "tokenName",
+        "value": "spotify-user-token-pkce",
+        "type": "string"
+      },
+      {
+        "key": "challengeAlgorithm",
+        "value": "S256",
+        "type": "string"
+      },
+      {
+        "key": "grant_type",
+        "value": "authorization_code_with_pkce",
+        "type": "string"
+      },
+      {
+        "key": "clientId",
+        "value": "{{client_id}}",
+        "type": "string"
+      },
+      {
+        "key": "addTokenTo",
+        "value": "header",
+        "type": "string"
+      },
+      {
+        "key": "client_authentication",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
   "event": [
     {
       "listen": "prerequest",
@@ -299,12 +507,22 @@
   ],
   "variable": [
     {
-      "key": "redirect_uri",
+      "key": "code_verifier",
+      "value": ""
+    },
+    {
+      "key": "code_challenge",
       "value": ""
     },
     {
       "key": "auth_base_url",
-      "value": ""
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "redirect_uri",
+      "value": "",
+      "type": "default"
     }
   ]
 }
