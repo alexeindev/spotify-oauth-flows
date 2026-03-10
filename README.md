@@ -1,171 +1,173 @@
-# Spotify API — OAuth 2.0 Flows Postman Collection
+# 🎵 Spotify OAuth 2.0 Flows — Postman Demo
 
-> Postman collection covering the three main OAuth 2.0 grant types — Client Credentials, Authorization Code, and Authorization Code with PKCE — using the Spotify Web API.
-
----
-
-## 📋 Project Overview
-
-This collection demonstrates the three OAuth 2.0 grant types supported by the Spotify Web API, implemented progressively from least to most complex. Each flow is organized as its own folder with dedicated environment variables, token management scripts, and test assertions.
+A Postman collection demonstrating the three OAuth 2.0 grant types supported by the Spotify Web API, with pre-request scripts for automated token management and environment variable handling.
 
 ---
 
-## 🔑 The Three Flows — At a Glance
+## 📌 What This Project Covers
 
-| Flow | Use Case | Requires User Login | client_secret Exposed |
-|---|---|---|---|
-| Client Credentials | App-to-app, public data | No | Yes (server-side only) |
-| Authorization Code | User private data, server-side apps | Yes | Yes (server-side only) |
-| Authorization Code + PKCE | User private data, frontend/mobile apps | Yes | No |
-
----
-
-## 🛠️ Tech Stack
-
-| Tool | Purpose |
-|---|---|
-| Postman | Collection design and manual execution |
-| Newman | Command-line execution |
-| newman-reporter-htmlextra | HTML report generation |
-| Node.js v18+ | Required by Newman |
-| Spotify Web API | API under test |
+| Flow                      | Client Type  | Token Type       | Requires User |
+| ------------------------- | ------------ | ---------------- | ------------- |
+| Client Credentials        | Confidential | Access only      | No            |
+| Authorization Code        | Confidential | Access + Refresh | Yes           |
+| Authorization Code + PKCE | Public       | Access + Refresh | Yes           |
 
 ---
 
-## 📁 Collection Structure
+## 🗂️ Collection Structure
+
+Each flow is organized into **Positive Scenarios** and **Negative Scenarios**.
 
 ```
-Spotify OAuth 2.0 Flows
-│
-├── 01 - Client Credentials Flow
-│   ├── POST Get Token
-│   ├── GET Search Artist
-│   └── GET Get Album
-│
-├── 02 - Authorization Code Flow
-│   ├── Step 1 - Get Authorization Code
-│   ├── Step 2 - Exchange Code for Tokens
-│   ├── Step 3 - Refresh Token
-│   ├── GET /me
-│   ├── POST Create Playlist
-│   ├── GET Playlist by ID
-│   ├── PUT Update Playlist
-│   └── DELETE Playlist
-│
-└── 03 - Authorization Code + PKCE
-    ├── Step 1 - Generate Code Verifier & Challenge
-    ├── Step 2 - Get Authorization Code (PKCE)
-    ├── Step 3 - Exchange Code for Tokens (no client_secret)
-    └── GET /me (PKCE-authenticated)
+Flow 01 - Client Credentials
+├── Positive Scenarios
+│   ├── POST  01 - Get authorization token
+│   └── GET   02 - Get Artist Info
+└── Negative Scenarios
+    ├── POST  01 - Get authorization token - Invalid Credentials
+    ├── GET   02 - Get artist info - Invalid Token
+    └── GET   03 - Get artist info - Invalid Artist ID
+
+Flow 02 - Authorization Code
+├── Positive Scenarios
+│   ├── GET   01 - Build Authorization URL (Open URL in Browser)
+│   ├── POST  02 - Exchange Authorization Code for Tokens
+│   ├── POST  03 - Refresh Token
+│   └── GET   04 - Get User Playlists
+└── Negative Scenarios
+    └── GET   01 - Get User Playlists No token provided
+
+Flow 03 - Authorization Code + PKCE
+├── Positive Scenarios
+│   ├── GET   01 - Build Authorization URL (Open URL in Browser)
+│   ├── POST  02 - Exchange Authorization Code for Tokens
+│   ├── POST  03 - Refresh Token
+│   └── GET   04 - Get user information
+└── Negative Scenarios
+    ├── GET   Get users playlists - No token provided
+    └── POST  Refresh Token revoked
 ```
 
 ---
 
-## ⚙️ Environment Variables
+## ⚙️ Setup
 
-### Shared (all flows)
-| Variable | Description | Set by... |
-|---|---|---|
-| `client_id` | Your app's Client ID | Manual (initial setup) |
-| `redirect_uri` | `https://oauth.pstmn.io/v1/callback` | Manual (initial setup) |
+### Prerequisites
+
+- [Postman](https://www.postman.com/downloads/) v10+
+- A registered app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+
+### 1. Register Your App on Spotify
+
+1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) → **Create App**
+2. Set **Redirect URI** to: `https://oauth.pstmn.io/v1/callback`
+3. Copy your `Client ID` and `Client Secret`
+
+### 2. Configure the Environment
+
+Import `SpotifyEnv.postman_environment.json` into Postman and fill in your credentials:
+
+| Variable                  | Type    | Description                                                              |
+| ------------------------- | ------- | ------------------------------------------------------------------------ |
+| `client_id`               | secret  | Your Spotify App Client ID                                               |
+| `client_secret`           | secret  | Your Spotify App Client Secret _(Auth Code flow only)_                   |
+| `access_token`            | secret  | Populated automatically after token exchange (Auth Code flow)            |
+| `refresh_token`           | secret  | Populated automatically after token exchange (Auth Code flow)            |
+| `access_token_pkce`       | secret  | Populated automatically after token exchange (PKCE flow)                 |
+| `refresh_token_pkce`      | secret  | Populated automatically after token exchange (PKCE flow)                 |
+| `authorization_code`      | default | The `code` returned by Spotify after user authorization (Auth Code flow) |
+| `authorization_code_pkce` | default | The `code` returned by Spotify after user authorization (PKCE flow)      |
+
+> ⚠️ **Never commit credentials to version control.** Secret-type variables are stored locally in Postman and are not exported. Keep `SpotifyEnv.postman_environment.json` in `.gitignore`.
+
+### 3. Import the Collection
+
+Import the collection file into Postman. All three flows live in a single collection.
+
+---
+
+## 🚀 Running the Flows
 
 ### Flow 01 — Client Credentials
-| Variable | Description | Set by... |
-|---|---|---|
-| `client_secret` | Your app's Client Secret | Manual (initial setup) |
-| `cc_access_token` | App-level access token | Automatically via Test script |
-| `cc_token_expiry` | Expiry timestamp | Automatically via Test script |
+
+No user interaction required.
+
+1. Fill in `client_id` and `client_secret` in the environment
+2. Run **01 - Get authorization token** — `access_token` is stored automatically
+3. Run **02 - Get Artist Info** to verify
 
 ### Flow 02 — Authorization Code
-| Variable | Description | Set by... |
-|---|---|---|
-| `client_secret` | Your app's Client Secret | Manual (initial setup) |
-| `ac_access_token` | User access token | Automatically via Test script |
-| `ac_refresh_token` | Refresh token | Automatically via Test script |
-| `ac_token_expiry` | Expiry timestamp | Automatically via Test script |
-| `user_id` | Authenticated user's ID | Automatically via Test script |
-| `created_playlist_id` | ID of the playlist created in tests | Automatically via Test script |
+
+Requires manual browser step to obtain the authorization code.
+
+1. Run **01 - Build Authorization URL** — the pre-request script generates the URL and logs it to the Postman console
+2. Open that URL in a browser, log in, and authorize the app
+3. Copy the `code` parameter from the redirect URL and paste it into `authorization_code` in the environment
+4. Run **02 - Exchange Authorization Code for Tokens** — `access_token` and `refresh_token` are stored automatically
+5. Run **03 - Refresh Token** to test token renewal
+6. Run **04 - Get User Playlists** to verify the token works
 
 ### Flow 03 — Authorization Code + PKCE
-| Variable | Description | Set by... |
-|---|---|---|
-| `pkce_code_verifier` | Random string (43–128 chars) | Automatically via Pre-request Script |
-| `pkce_code_challenge` | SHA-256 hash of verifier, Base64url encoded | Automatically via Pre-request Script |
-| `pkce_access_token` | User access token (no client_secret used) | Automatically via Test script |
-| `pkce_refresh_token` | Refresh token | Automatically via Test script |
 
-> ⚠️ Never commit an environment file with real credentials. The `spotify_environment.json` in the repo must have all secret values empty.
+Same browser step as Flow 02, but no `client_secret` is used. The PKCE `code_verifier` and `code_challenge` are generated in the pre-request script.
 
----
-
-## 🚀 Setup
-
-### 1. Prerequisites
-- A Spotify account (free tier works)
-- Node.js v18+
-- Postman installed
-
-### 2. Register a Spotify App
-1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
-2. Create a new app
-3. Under *Redirect URIs*, add: `https://oauth.pstmn.io/v1/callback`
-4. Copy your `Client ID` and `Client Secret`
-
-### 3. Install Newman
-```bash
-npm install -g newman newman-reporter-htmlextra
-```
-
-### 4. Import into Postman
-1. Import `spotify_collection.json`
-2. Import `spotify_environment.json`
-3. Fill in `client_id`, `client_secret`, and `redirect_uri`
-
-### 5. First Authorization per Flow
-
-**Flow 01 — Client Credentials:** No browser interaction needed. Run `POST Get Token` and you're ready.
-
-**Flow 02 — Authorization Code (manual, one time only):**
-1. Run *Step 1 - Get Authorization Code* — the Spotify login page opens in the browser
-2. Authorize the app — Postman captures the callback automatically
-3. Run *Step 2 - Exchange Code for Tokens*
-4. The `ac_refresh_token` is saved — from this point the token refresh is fully automatic
-
-**Flow 03 — Authorization Code + PKCE (manual, one time only):**
-1. Run *Step 1 - Generate Code Verifier & Challenge* — values are generated and stored automatically
-2. Run *Step 2 - Get Authorization Code (PKCE)* — authorize in the browser
-3. Run *Step 3 - Exchange Code for Tokens* — no `client_secret` is sent in this request
+1. Run **01 - Build Authorization URL** — PKCE parameters are generated and the URL is logged to the console
+2. Open that URL in a browser, log in, and authorize the app
+3. Copy the `code` from the redirect URL and paste it into `authorization_code_pkce` in the environment
+4. Run **02 - Exchange Authorization Code for Tokens** — `access_token_pkce` and `refresh_token_pkce` are stored automatically
+5. Run **03 - Refresh Token** to test rotation
+6. Run **04 - Get user information** to verify
 
 ---
 
-## ▶️ Run with Newman
+## ⚠️ Why These Flows Can't Be Automated with Newman
 
-Run all flows:
+Newman (Postman's CLI runner) is designed for headless, non-interactive execution. Two of the three flows in this project — **Authorization Code** and **Authorization Code + PKCE** — require a real user to log in to Spotify and grant permissions through a browser. That interactive step happens outside of Postman entirely and cannot be automated headlessly.
+
+The flow breaks down like this:
+
+1. Your app redirects the user to `accounts.spotify.com/authorize`
+2. Spotify renders a login/consent page in a browser
+3. The user authenticates and approves scopes
+4. Spotify redirects back with a one-time `authorization_code` in the URL
+
+Newman has no browser, no way to interact with a login page, and no way to intercept that redirect. You would need to manually grab the `authorization_code` from the redirect URL and paste it into the environment before the token exchange step can run.
+
+**The only flow that is fully automatable with Newman is Client Credentials**, since it is a pure machine-to-machine exchange — no user, no browser, no redirect.
+
 ```bash
-newman run spotify_collection.json \
-  -e spotify_environment.json \
-  -r htmlextra \
-  --reporter-htmlextra-export ./reports/report.html
+# Only the Client Credentials collection can run headlessly
+newman run collections/client-credentials.postman_collection.json \
+  --environment environments/spotify-oauth.postman_environment.json \
+  --reporters cli,htmlextra \
+  --reporter-htmlextra-export reports/results.html
 ```
 
-Run a single folder:
-```bash
-newman run spotify_collection.json \
-  -e spotify_environment.json \
-  --folder "01 - Client Credentials Flow" \
-  -r htmlextra \
-  --reporter-htmlextra-export ./reports/report-cc.html
-```
+For the Authorization Code and PKCE flows, use Postman's collection runner after completing the manual auth step described above.
 
-Reports are saved to the `/reports` folder. Open the `.html` file in any browser to view results.
+## 🔄 Token Lifecycle & Security Notes
+
+- **Access tokens** expire after 3600 seconds (1 hour). The collections include pre-request scripts that check expiry and refresh automatically.
+- **Refresh token rotation**: Spotify may issue a new refresh token on each use. The collections store the latest token, invalidating the previous one.
+- **PKCE protects against authorization code interception** — even if the code is stolen, it's useless without the `code_verifier` that never leaves the client.
+- `client_secret` is only used in confidential flows. It must never be exposed in client-side code or committed to a public repository.
+
+---
+
+## 📊 Scopes Used
+
+| Scope               | Purpose                          |
+| ------------------- | -------------------------------- |
+| `user-read-private` | Read user's subscription details |
+| `user-read-email`   | Access user's email address      |
+
+Adjust scopes in the environment variable based on what your use case requires. Full scope list: [Spotify Scopes Reference](https://developer.spotify.com/documentation/web-api/concepts/scopes).
 
 ---
 
 ## 📚 References
 
-- [Spotify — Which OAuth Flow to Use](https://developer.spotify.com/documentation/web-api/concepts/authorization)
-- [Spotify — Client Credentials Flow](https://developer.spotify.com/documentation/web-api/tutorials/client-credentials-flow)
-- [Spotify — Authorization Code Flow](https://developer.spotify.com/documentation/web-api/tutorials/code-flow)
-- [Spotify — Authorization Code + PKCE Flow](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow)
-- [Spotify — Refreshing Tokens](https://developer.spotify.com/documentation/web-api/tutorials/refreshing-tokens)
-- [newman-reporter-htmlextra](https://github.com/DannyDainton/newman-reporter-htmlextra)
+- [Spotify Authorization Guide](https://developer.spotify.com/documentation/web-api/concepts/authorization)
+- [RFC 6749 – The OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)
+- [RFC 7636 – PKCE](https://datatracker.ietf.org/doc/html/rfc7636)
+- [Postman OAuth 2.0 Docs](https://learning.postman.com/docs/sending-requests/authorization/oauth-20/)
